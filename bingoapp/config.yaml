@@ -1,0 +1,11 @@
+student_email: data.scientist.pro@yandex.ru
+postgres_cluster:
+  hosts:
+  - address: 172.70.0.200
+    port: 5432
+  user: bingo
+  password: bingopass
+  db_name: bingodb
+  ssl_mode: disable
+  use_closest_node: false
+

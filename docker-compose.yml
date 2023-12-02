@@ -1,0 +1,156 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:14.8-alpine3.18
+    networks:
+      bingonetwork:
+        ipv4_address: 172.70.0.200
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=512MB"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "temp_file_limit=1GB"
+      - "-c"
+      - "log_min_duration_statement=200ms"
+      - "-c"
+      - "idle_in_transaction_session_timeout=10s"
+      - "-c"
+      - "lock_timeout=1s"
+      - "-c"
+      - "statement_timeout=30s"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "pg_stat_statements.track=all"
+    environment:
+      POSTGRES_HOST: "172.70.0.200"
+      POSTGRES_DB: "bingodb"
+      POSTGRES_USER: "bingo"
+      POSTGRES_PASSWORD: "bingopass"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d
+      - ./bingodb-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bingo -d bingodb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 2G
+
+  bingo-node1:
+    image: bingoapp
+    #command: ["/opt/bingo/bingo", "run_server"]
+    #command: ["/opt/bingo/bingo", "print_current_config"]
+    #command: ["ping", "-c", "1000", "10.100.0.3"]
+    command: ["/opt/bingo/entrypoint.sh"]
+    #command: ["ip", "a"]
+    networks:
+      bingonetwork:
+        ipv4_address: 172.70.0.101
+    ports:
+      - "127.0.0.1:3901:3901"
+    volumes:
+      - ./bingoapp:/opt/bingo/
+      - ./logs/node1:/opt/bongo/logs/a516f07394
+    user: "bingo:bingo"
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 50M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3901/ping"]
+      interval: 1s
+      timeout: 15s
+      retries: 3
+      start_period: 5s
+    restart: always
+
+  bingo-node2:
+    image: bingoapp
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    #command: ["/opt/bingo/bingo", "run_server"]
+    command: ["/opt/bingo/entrypoint.sh"]
+    #command: ["/opt/bingo/bingo", "print_current_config"]
+    #command: ["ping", "-c", "1000", "10.100.0.3"]
+    #command: ["ip", "a"]
+    networks:
+      bingonetwork:
+        ipv4_address: 172.70.0.102
+    ports:
+      - "127.0.0.1:3902:3901"
+    volumes:
+      - ./bingoapp:/opt/bingo/
+      - ./logs/node2:/opt/bongo/logs/a516f07394
+    user: "bingo:bingo"
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 50M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3901/ping"]
+      interval: 1s
+      timeout: 15s
+      retries: 3
+      start_period: 5s
+    restart: always
+
+  nginx:
+    image: macbre/nginx-http3
+    networks:
+      bingonetwork:
+        ipv4_address: 172.70.0.100
+    ports:
+      - "80:1080"
+      - "443:1443/tcp"
+      - "443:1443/udp"
+    volumes:
+      - ./nginx:/etc/nginx
+      - ./logs/nginx:/var/log/nginx
+    restart: always
+    #command: ["nginx", "-t"]
+
+networks:
+  bingonetwork:
+#    driver: host
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.70.0.0/16
+#          gateway: 10.10.10.1
+
+volumes:
+  bingoapp:
+  node1:
+  node2:
+  bingodb-data:
+#  postgres:
